@@ -7,6 +7,7 @@ import {
   handoffSettings,
   callerOrigin,
   toolOutcome,
+  providerDimensions,
 } from "./ProviderDimensions.ts";
 
 const provider = (
@@ -223,4 +224,18 @@ it("tells user, agent, system, and scheduled work apart", () => {
   expect(callerOrigin({ thread: { createdBy: "agent" }, scheduledRun: false })).toBe("agent");
   expect(callerOrigin({ thread: { createdBy: "system" }, scheduledRun: false })).toBe("system");
   expect(callerOrigin({ thread: { createdBy: "user" }, scheduledRun: true })).toBe("scheduler");
+});
+
+it("does not report custom provider model names", () => {
+  const customProviders = [
+    provider("custom-1", "customProvider", [{ slug: "qwen3.5:4b", isCustom: false }]),
+  ];
+  expect(
+    providerDimensions(customProviders, {
+      instanceId: ProviderInstanceId.make("custom-1"),
+      model: "qwen3.5:4b",
+    }),
+  ).toEqual({
+    provider: "customProvider",
+  });
 });

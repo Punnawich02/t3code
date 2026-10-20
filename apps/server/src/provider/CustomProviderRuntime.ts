@@ -66,7 +66,7 @@ export function customProviderEnvironment(input: {
 }
 
 export function customProviderHomePath(
-  path: Path.Path["Service"],
+  path: Path.Path,
   stateDir: string,
   instanceId: string,
 ): string {

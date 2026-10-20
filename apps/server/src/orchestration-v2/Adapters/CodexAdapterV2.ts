@@ -812,10 +812,11 @@ function providerSession(input: {
   readonly cwd: string | null;
   readonly model: string;
   readonly now: DateTime.Utc;
+  readonly driver?: ProviderDriverKind;
 }): OrchestrationV2ProviderSession {
   return {
     id: input.providerSessionId,
-    driver: CODEX_PROVIDER,
+    driver: input.driver ?? CODEX_PROVIDER,
     providerInstanceId: input.providerInstanceId,
     status: "ready",
     cwd: input.cwd ?? process.cwd(),
@@ -845,6 +846,7 @@ function providerThreadFromCodexThread(input: {
   readonly ownerNodeId: OrchestrationV2ProviderThread["ownerNodeId"];
   readonly providerSessionId: OrchestrationV2ProviderThread["providerSessionId"];
   readonly providerInstanceId: ProviderInstanceId;
+  readonly driver?: ProviderDriverKind;
   readonly thread: {
     readonly createdAt: number;
     readonly forkedFromId?: string | null;
@@ -853,18 +855,19 @@ function providerThreadFromCodexThread(input: {
   };
   readonly forkedFrom?: OrchestrationV2ProviderThread["forkedFrom"];
 }): OrchestrationV2ProviderThread {
+  const driver = input.driver ?? CODEX_PROVIDER;
   return {
     id: input.idAllocator.derive.providerThread({
-      driver: CODEX_PROVIDER,
+      driver,
       nativeThreadId: input.thread.id,
     }),
-    driver: CODEX_PROVIDER,
+    driver,
     providerInstanceId: input.providerInstanceId,
     providerSessionId: input.providerSessionId,
     appThreadId: input.appThreadId,
     ownerNodeId: input.ownerNodeId,
     nativeThreadRef: {
-      driver: CODEX_PROVIDER,
+      driver,
       nativeId: input.thread.id,
       strength: "strong" as const,
     },
@@ -1566,7 +1569,7 @@ export type CodexAdapterV2DriverEnv =
 
 export const createCodexAdapterV2 = (
   { instanceId, environment, enabled, config }: ProviderAdapterDriverCreateInput<CodexSettings>,
-  hooks: Pick<CodexAdapterV2Options, "onUsageLimits" | "resolveRuntime"> = {},
+  hooks: Pick<CodexAdapterV2Options, "onUsageLimits" | "resolveRuntime" | "driverKind"> = {},
 ) =>
   Effect.gen(function* () {
     const clientFactory = yield* CodexAppServerClientFactory;
@@ -1659,6 +1662,7 @@ export interface CodexAdapterV2Options {
   readonly clientFactory: CodexAppServerClientFactoryShape;
   readonly onUsageLimits?: ManagedServerProvider["applyUsageLimits"];
   readonly resolveRuntime?: Effect.Effect<CodexEffectiveRuntime, ProviderSetupError, Scope.Scope>;
+  readonly driverKind?: ProviderDriverKind;
   readonly crypto: Crypto.Crypto;
   readonly fileSystem: FileSystem.FileSystem;
   readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
@@ -1682,10 +1686,11 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
     threadId === null ? Effect.succeed(undefined) : mcpSessions.read(threadId);
   const { clientFactory, crypto, fileSystem, idAllocator, serverConfig } = adapterOptions;
   const continuationRequests = adapterOptions.continuationRequests;
+  const adapterDriver = adapterOptions.driverKind ?? CODEX_PROVIDER;
 
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: adapterOptions.instanceId,
-    driver: CODEX_PROVIDER,
+    driver: adapterDriver,
     getCapabilities: () => Effect.succeed(CodexProviderCapabilitiesV2),
     planSelectionTransition: () => Effect.succeed(turnScopedSelectionTransition()),
     openSession: (input) =>
@@ -1789,6 +1794,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           providerInstanceId: adapterOptions.instanceId,
           cwd: input.runtimePolicy.cwd,
           model: input.modelSelection.model,
+          driver: adapterDriver,
           now,
         });
         const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
@@ -1911,7 +1917,12 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           goalRuns.get(providerTurnId)?.at(-1)?.providerTurnId ?? providerTurnId;
 
         const emitProviderEvent = (event: ProviderAdapter.ProviderAdapterV2Event) =>
-          Queue.offer(events, event).pipe(Effect.asVoid);
+          Queue.offer(
+            events,
+            adapterOptions.driverKind === undefined
+              ? event
+              : { ...event, driver: adapterOptions.driverKind },
+          ).pipe(Effect.asVoid);
 
         const emitGoalUpdate = Effect.fnUntraced(function* (nativeThreadId: string) {
           const providerThread = rootProviderThreads.get(nativeThreadId);
@@ -4817,7 +4828,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     yield* continuationRequests.offer({
                       threadId: context.projectionThreadId,
                       providerThreadId: context.providerThread.id,
-                      driver: CODEX_PROVIDER,
+                      driver: adapterDriver,
                       detail: codexBackgroundCommandDetail(payload.item),
                       notification: {
                         ...backgroundWorkNotification([
@@ -6410,7 +6421,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
 
         const runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime = {
           instanceId: adapterOptions.instanceId,
-          driver: CODEX_PROVIDER,
+          driver: adapterDriver,
           providerSessionId: input.providerSessionId,
           providerSession: session,
           events: Stream.fromEffectRepeat(Queue.take(events)),
@@ -6481,6 +6492,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   ownerNodeId: null,
                   providerSessionId: input.providerSessionId,
                   providerInstanceId: adapterOptions.instanceId,
+                  driver: adapterDriver,
                   thread: response.thread,
                 }),
               ),
@@ -7318,8 +7330,9 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 appThreadId: threadInput.targetThreadId,
                 idAllocator,
                 ownerNodeId: threadInput.ownerNodeId ?? null,
-                providerSessionId: input.providerSessionId,
                 providerInstanceId: adapterOptions.instanceId,
+                providerSessionId: input.providerSessionId,
+                driver: adapterDriver,
                 thread: forkedThread,
                 forkedFrom: {
                   providerThreadId: threadInput.sourceProviderThread.id,
@@ -7344,7 +7357,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
         Effect.mapError(
           (cause) =>
             new ProviderAdapter.ProviderAdapterOpenSessionError({
-              driver: CODEX_PROVIDER,
+              driver: adapterDriver,
               providerSessionId: input.providerSessionId,
               cause,
             }),

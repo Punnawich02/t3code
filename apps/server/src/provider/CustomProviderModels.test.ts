@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import { HttpClient, HttpClientResponse } from "effect/http";
+import { HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
 import { fetchCustomProviderModels } from "./CustomProviderModels.ts";
 
 it.effect("discovers models and de-duplicates in response order", () =>
@@ -121,7 +121,13 @@ it.effect("reports invalid JSON or incompatible schema error message", () =>
 
 it.effect("reports network failure error message", () =>
   Effect.gen(function* () {
-    const http = HttpClient.make(() => Effect.fail(new Error("Connection refused")));
+    const http = HttpClient.make((request) =>
+      Effect.fail(
+        new HttpClientError.HttpClientError({
+          reason: new HttpClientError.TransportError({ request }),
+        }),
+      ),
+    );
     const error = yield* Effect.flip(
       fetchCustomProviderModels({
         baseUrl: "http://localhost:11434/v1",
