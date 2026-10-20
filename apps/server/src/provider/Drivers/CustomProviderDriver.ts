@@ -17,6 +17,7 @@ import { withInstanceIdentity } from "@t3tools/provider-core/server/instanceIden
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
 import {
   buildServerProvider,
+  type ServerProviderDraft,
   providerModelsFromSettings,
 } from "@t3tools/provider-core/server/snapshotProbe";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
@@ -79,13 +80,16 @@ export const CustomProviderDriver: ProviderDriver<CustomProviderSettings, Custom
           driverKind: DRIVER_KIND,
           instanceId,
         });
-        const stamp = withInstanceIdentity({
+        const stampIdentity = withInstanceIdentity({
           instanceId,
           driverKind: DRIVER_KIND,
           displayName: displayName || "Custom Provider",
           accentColor,
           continuationGroupKey: continuationIdentity.continuationKey,
         });
+        // Install goes through the shared managed Codex installer; there is no login step.
+        const stamp = (provider: ServerProviderDraft) =>
+          stampIdentity({ ...provider, setup: { canInstall: true, canAuthenticate: false } });
 
         const resolveRuntime: Effect.Effect<
           CodexEffectiveRuntime,
@@ -177,7 +181,6 @@ export const CustomProviderDriver: ProviderDriver<CustomProviderSettings, Custom
           function* () {
             const checkedAt = yield* Effect.map(DateTime.now, DateTime.formatIso);
 
-            // 1. disabled -> base snapshot
             if (!enabled) {
               return stamp(
                 buildServerProvider({
@@ -201,7 +204,6 @@ export const CustomProviderDriver: ProviderDriver<CustomProviderSettings, Custom
               );
             }
 
-            // 2. invalid Base URL -> message: "Enter a valid http(s) Base URL in provider settings.", models: []
             const normalizedUrl = normalizeCustomProviderBaseUrl(config.baseUrl);
             if (Option.isNone(normalizedUrl)) {
               return stamp(
@@ -226,7 +228,6 @@ export const CustomProviderDriver: ProviderDriver<CustomProviderSettings, Custom
               );
             }
 
-            // 3. executable not resolvable -> installed: false, setup: { canInstall: true, canAuthenticate: false }, message: "Set up the Codex runtime to use this provider."
             const executable = yield* installation.resolve().pipe(Effect.option);
             if (Option.isNone(executable)) {
               return stamp(
@@ -251,7 +252,6 @@ export const CustomProviderDriver: ProviderDriver<CustomProviderSettings, Custom
               );
             }
 
-            // 4. fetchCustomProviderModels fails -> installed: true, models: [], message: <error.message>
             const fetchResult = yield* fetchCustomProviderModels({
               baseUrl: normalizedUrl.value,
               apiKey: config.apiKey,
@@ -284,7 +284,6 @@ export const CustomProviderDriver: ProviderDriver<CustomProviderSettings, Custom
               );
             }
 
-            // 5. success -> installed: true, auth: { status: "authenticated" } (no login concept), models = discovered ids + customModels
             const discoveredModels: ServerProviderModel[] = fetchResult.models.map((id) => ({
               slug: id,
               name: id,

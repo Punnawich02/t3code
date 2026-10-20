@@ -21,6 +21,8 @@ import * as ProviderRegistry from "./ProviderRegistry.ts";
 import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
 
 const ANTIGRAVITY = ProviderDriverKind.make("antigravity");
+const CODEX = ProviderDriverKind.make("codex");
+const CUSTOM_PROVIDER = ProviderDriverKind.make("customProvider");
 const hasBinaryPath = Schema.is(Schema.Struct({ binaryPath: Schema.String }));
 const decodeCodexSettings = Schema.decodeUnknownEffect(CodexSettings);
 const decodeAntigravitySettings = Schema.decodeUnknownEffect(AntigravitySettings);
@@ -55,7 +57,11 @@ export const makeProviderInstallation = Effect.fn("makeProviderInstallation")(fu
     managedOnly = false,
   ) {
     const instance = yield* instances.getInstance(instanceId);
-    const isCodex = instance?.driverKind === ProviderDriverKind.make("codex");
+    if (instance?.driverKind === CUSTOM_PROVIDER) {
+      // Custom Provider always runs the managed Codex runtime and has no binary path.
+      return { installation: codexInstallation, driver: CODEX };
+    }
+    const isCodex = instance?.driverKind === CODEX;
     if (instance?.driverKind !== ANTIGRAVITY && !isCodex) {
       return yield* new ProviderSetupError({
         instanceId,
@@ -151,7 +157,11 @@ export const makeProviderInstallation = Effect.fn("makeProviderInstallation")(fu
       .pipe(Effect.mapError(failure(input.instanceId)));
     const allInstances = yield* instances.listInstances;
     yield* Effect.forEach(
-      allInstances.filter((instance) => instance.driverKind === driver),
+      allInstances.filter(
+        (instance) =>
+          instance.driverKind === driver ||
+          (driver === CODEX && instance.driverKind === CUSTOM_PROVIDER),
+      ),
       (instance) => providers.refreshInstance(instance.instanceId),
       { discard: true },
     );

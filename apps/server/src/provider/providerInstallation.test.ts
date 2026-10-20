@@ -189,6 +189,26 @@ describe("provider installation routing", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
+  it.effect("installs Custom Provider through the managed Codex installer", () =>
+    Effect.gen(function* () {
+      const customId = ProviderInstanceId.make("ollama");
+      const harness = yield* makeHarness({
+        instance: instance(ProviderDriverKind.make("customProvider"), customId),
+        settings: {
+          providerInstances: {
+            [customId]: {
+              driver: ProviderDriverKind.make("customProvider"),
+              config: { baseUrl: "http://localhost:11434/v1" },
+            },
+          },
+        },
+      });
+      assert.equal((yield* harness.router.start({ instanceId: customId })).driver, "codex");
+      yield* harness.router.remove({ instanceId: customId });
+      assert.deepEqual(harness.calls, ["codex-start", "codex-remove", "refresh"]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
   it.effect("keeps native Codex installation outside managed setup", () =>
     Effect.gen(function* () {
       const codexId = ProviderInstanceId.make("codex");
