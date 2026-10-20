@@ -638,6 +638,52 @@ export const CodexSettings = makeProviderSettingsSchema(
 );
 export type CodexSettings = typeof CodexSettings.Type;
 
+export const CustomProviderSettings = makeProviderSettingsSchema(
+  {
+    enabled: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(true)),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+    apiFormat: Schema.Literals(["openai"]).pipe(
+      Schema.withDecodingDefault(Effect.succeed("openai")),
+      Schema.annotateKey({
+        title: "API format",
+      }),
+    ),
+    baseUrl: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Base URL",
+        description: "OpenAI-compatible endpoint, including /v1.",
+        providerSettingsForm: {
+          placeholder: "http://localhost:11434/v1",
+        },
+      }),
+    ),
+    apiKey: TrimmedString.pipe(
+      secretSetting,
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "API key",
+        description: "Optional. Stored separately on the host.",
+        providerSettingsForm: {
+          control: "password",
+          placeholder: "Optional",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    customModels: Schema.Array(CustomModelSetting).pipe(
+      Schema.withDecodingDefault(Effect.succeed([])),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+  },
+  {
+    order: ["apiFormat", "baseUrl", "apiKey"],
+  },
+);
+export type CustomProviderSettings = typeof CustomProviderSettings.Type;
+
 const CLAUDE_AUTO_COMPACT_WINDOW_PATTERN = /^(?:|[1-9]\d{5}|1000000)$/;
 
 export const ClaudeSettings = makeProviderSettingsSchema(

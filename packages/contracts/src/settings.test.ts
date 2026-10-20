@@ -13,6 +13,8 @@ import {
   resolveProviderInstanceEnabled,
   ServerSettings,
   ServerSettingsPatch,
+  CustomProviderSettings,
+  secretSettingsFields,
 } from "./settings.ts";
 
 const decodeClientSettings = Schema.decodeUnknownSync(ClientSettingsSchema);
@@ -1201,5 +1203,21 @@ describe("server model preferences", () => {
     expect(decodeServerSettingsPatch({ migrateModelPreferences: input })).toEqual({
       migrateModelPreferences: input,
     });
+  });
+});
+
+describe("CustomProviderSettings", () => {
+  it("decodes CustomProviderSettings defaults", () => {
+    expect(Schema.decodeSync(CustomProviderSettings)({})).toEqual({
+      enabled: true,
+      apiFormat: "openai",
+      baseUrl: "",
+      apiKey: "",
+      customModels: [],
+    });
+  });
+
+  it("marks apiKey as a secret setting", () => {
+    expect(secretSettingsFields(CustomProviderSettings)).toEqual(["apiKey"]);
   });
 });
