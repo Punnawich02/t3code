@@ -25,6 +25,7 @@ import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import { HttpClient } from "effect/http";
@@ -230,6 +231,12 @@ export const CustomProviderDriver: ProviderDriver<CustomProviderSettings, Custom
 
             const executable = yield* installation.resolve().pipe(Effect.option);
             if (Option.isNone(executable)) {
+              // Download the managed runtime in the background so adding the provider is enough;
+              // the installation refresh re-checks this instance when it finishes.
+              const download = yield* installation.start.pipe(Effect.result);
+              const downloadMessage = Result.isSuccess(download)
+                ? "Downloading the Codex runtime. The provider is ready when it finishes."
+                : download.failure.detail;
               return stamp(
                 buildServerProvider({
                   presentation: {
@@ -244,9 +251,9 @@ export const CustomProviderDriver: ProviderDriver<CustomProviderSettings, Custom
                   probe: {
                     installed: false,
                     version: null,
-                    status: "error",
+                    status: Result.isSuccess(download) ? "warning" : "error",
                     auth: { status: "unknown" },
-                    message: "Set up the Codex runtime to use this provider.",
+                    message: downloadMessage,
                   },
                 }),
               );

@@ -648,6 +648,11 @@ export const CustomProviderSettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed("openai")),
       Schema.annotateKey({
         title: "API format",
+        providerSettingsForm: {
+          control: "select",
+          options: [{ value: "openai", label: "OpenAI" }],
+          clearWhenEmpty: "omit",
+        },
       }),
     ),
     baseUrl: TrimmedString.pipe(
