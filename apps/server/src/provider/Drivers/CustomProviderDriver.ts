@@ -29,7 +29,6 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import { HttpClient } from "effect/http";
-import { ChildProcessSpawner } from "effect/process";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 
@@ -45,10 +44,7 @@ import {
   normalizeCustomProviderBaseUrl,
 } from "../CustomProviderRuntime.ts";
 import { ProviderDriverError } from "../Errors.ts";
-import {
-  createCodexAdapterV2,
-  type CodexAdapterV2DriverEnv,
-} from "../../orchestration-v2/Adapters/CodexAdapterV2.ts";
+import { createCodexAdapterV2 } from "../../orchestration-v2/Adapters/CodexAdapterV2.ts";
 
 const DRIVER_KIND = ProviderDriverKind.make("customProvider");
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);

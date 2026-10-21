@@ -1206,9 +1206,11 @@ describe("server model preferences", () => {
   });
 });
 
+const decodeCustomProviderSettings = Schema.decodeSync(CustomProviderSettings);
+
 describe("CustomProviderSettings", () => {
   it("decodes CustomProviderSettings defaults", () => {
-    expect(Schema.decodeSync(CustomProviderSettings)({})).toEqual({
+    expect(decodeCustomProviderSettings({})).toEqual({
       enabled: true,
       apiFormat: "openai",
       baseUrl: "",

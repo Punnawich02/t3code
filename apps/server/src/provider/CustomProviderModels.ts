@@ -70,11 +70,10 @@ export const fetchCustomProviderModels = (input: {
     return models;
   }).pipe(
     Effect.timeout("10 seconds"),
-    Effect.catchTag(
-      "TimeoutError",
-      () =>
+    Effect.catchTags({
+      TimeoutError: () =>
         new CustomProviderEndpointError({
           message: `Could not reach ${input.baseUrl}. Check that the server is running and reachable from this machine.`,
         }),
-    ),
+    }),
   );

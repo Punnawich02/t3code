@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
@@ -80,20 +80,19 @@ describe("CustomProviderRuntime", () => {
   });
 
   describe("customProviderHomePath", () => {
-    it("separate homes per instance", () =>
-      Effect.runSync(
-        Effect.gen(function* () {
-          const path = yield* Path.Path;
-          const stateDir = "/tmp/t3-state";
-          const home1 = customProviderHomePath(path, stateDir, "ollama_local");
-          const home2 = customProviderHomePath(path, stateDir, "runpod");
+    it.effect("separate homes per instance", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const stateDir = "/tmp/t3-state";
+        const home1 = customProviderHomePath(path, stateDir, "ollama_local");
+        const home2 = customProviderHomePath(path, stateDir, "runpod");
 
-          expect(home1).not.toEqual(home2);
-          expect(home1).toBe("/tmp/t3-state/providers/customProvider/ollama_local/codex-home");
-          expect(home2).toBe("/tmp/t3-state/providers/customProvider/runpod/codex-home");
-          expect(home1.startsWith("/tmp/t3-state/providers/customProvider/")).toBe(true);
-          expect(home2.startsWith("/tmp/t3-state/providers/customProvider/")).toBe(true);
-        }).pipe(Effect.provide(Path.layer)),
-      ));
+        expect(home1).not.toEqual(home2);
+        expect(home1).toBe("/tmp/t3-state/providers/customProvider/ollama_local/codex-home");
+        expect(home2).toBe("/tmp/t3-state/providers/customProvider/runpod/codex-home");
+        expect(home1.startsWith("/tmp/t3-state/providers/customProvider/")).toBe(true);
+        expect(home2.startsWith("/tmp/t3-state/providers/customProvider/")).toBe(true);
+      }).pipe(Effect.provide(Path.layer)),
+    );
   });
 });
