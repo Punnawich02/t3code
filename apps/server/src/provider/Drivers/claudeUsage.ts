@@ -12,6 +12,9 @@ import {
 } from "@t3tools/provider-core/server/usage";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
+import * as ServerConfig from "../../config.ts";
+import { claudeApiKeyConfigDir } from "./ClaudeApiKey.ts";
+
 /**
  * T3 Code writes one record per assistant *content block*, and every one of those records repeats
  * the same complete `usage` object for the parent message. Summing them overcounts by roughly
@@ -90,18 +93,30 @@ export const claudeUsageFormat: TranscriptUsageFormat<void> = {
   parseProjected: (projected) => orEmpty(parseClaudeRecord(projected)),
 };
 
-export const claudeUsageReader: ProviderUsageReader<ClaudeSettings, Path.Path> = {
+export const claudeUsageReader: ProviderUsageReader<
+  ClaudeSettings,
+  Path.Path | ServerConfig.ServerConfig
+> = {
   kind: "transcripts",
   provider: "claude",
   format: claudeUsageFormat,
-  directories: Effect.fn("claudeUsageReader.directories")(function* ({ config, environment }) {
+  directories: Effect.fn("claudeUsageReader.directories")(function* ({
+    instanceId,
+    config,
+    environment,
+  }) {
     if (config === undefined) return [];
     const path = yield* Path.Path;
     const homeDirectory = yield* HostProcess.HomeDirectory;
     const configured = config.homePath.trim();
+    const inherited = environment.CLAUDE_CONFIG_DIR?.trim();
+    // Mirrors the dir ClaudeDriver gives an API-key instance, whose transcripts live there.
     const home = configured
       ? expandHomePath(configured, homeDirectory)
-      : environment.CLAUDE_CONFIG_DIR?.trim() || path.join(homeDirectory, ".claude");
+      : inherited ||
+        (config.apiKey.length > 0
+          ? claudeApiKeyConfigDir(path, (yield* ServerConfig.ServerConfig).stateDir, instanceId)
+          : path.join(homeDirectory, ".claude"));
     return [{ dir: path.resolve(home, "projects") }];
   }),
 };

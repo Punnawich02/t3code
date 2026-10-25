@@ -1,6 +1,14 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
+import { ClaudeSettings, ProviderInstanceId } from "@t3tools/contracts";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
-import { parseClaudeLine } from "./claudeUsage.ts";
+import * as ServerConfig from "../../config.ts";
+import { claudeUsageReader, parseClaudeLine } from "./claudeUsage.ts";
+
+const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 
 function claudeLine(overrides: {
   messageId: string;
@@ -70,4 +78,41 @@ describe("parseClaudeLine", () => {
     expect(parseClaudeLine(JSON.stringify({ type: "user", message: {} }))).toBeNull();
     expect(parseClaudeLine("not json")).toBeNull();
   });
+});
+
+const transcriptReader = claudeUsageReader;
+if (transcriptReader.kind !== "transcripts")
+  throw new Error("Claude usage comes from transcripts.");
+
+describe("claudeUsageReader.directories", () => {
+  const testLayer = ServerConfig.layerTest(process.cwd(), { prefix: "t3-claude-usage-" }).pipe(
+    Layer.provideMerge(NodeServices.layer),
+  );
+
+  it.effect("reads an API-key instance's transcripts from its own config dir", () =>
+    Effect.gen(function* () {
+      const { stateDir } = yield* ServerConfig.ServerConfig;
+      const directories = yield* transcriptReader.directories({
+        instanceId: ProviderInstanceId.make("claude_api"),
+        config: decodeClaudeSettings({ apiKey: "sk-ant-test" }),
+        environment: {},
+        configured: true,
+      });
+      expect(directories).toEqual([
+        { dir: `${stateDir}/providers/claudeAgent/claude_api/config/projects` },
+      ]);
+    }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect("keeps a user-set CLAUDE_CONFIG_DIR for an API-key instance", () =>
+    Effect.gen(function* () {
+      const directories = yield* transcriptReader.directories({
+        instanceId: ProviderInstanceId.make("claude_api"),
+        config: decodeClaudeSettings({ apiKey: "sk-ant-test" }),
+        environment: { CLAUDE_CONFIG_DIR: "/custom/claude" },
+        configured: true,
+      });
+      expect(directories).toEqual([{ dir: "/custom/claude/projects" }]);
+    }).pipe(Effect.provide(testLayer)),
+  );
 });

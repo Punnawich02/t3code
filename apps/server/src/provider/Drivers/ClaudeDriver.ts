@@ -60,6 +60,7 @@ import {
   makeClaudeContinuationGroupKey,
   resolveClaudeHomePath,
 } from "./ClaudeHome.ts";
+import { claudeApiKeyConfigDir, withClaudeApiKeyEnvironment } from "./ClaudeApiKey.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 
@@ -104,7 +105,11 @@ export type ClaudeDriverEnv =
   | ProviderEventLoggers.ProviderEventLoggers
   | ServerConfig.ServerConfig;
 
-export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.Path> = {
+export const ClaudeDriver: ProviderDriver<
+  ClaudeSettings,
+  ClaudeDriverEnv,
+  Path.Path | ServerConfig.ServerConfig
+> = {
   driverKind: DRIVER_KIND,
   metadata: {
     displayName: "Claude",
@@ -121,6 +126,31 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       // The server cwd is $HOME in packaged desktop builds, and `claude`
       // wrappers that scope themselves to their cwd refuse to run there.
       const { stateDir } = yield* ServerConfig.ServerConfig;
+      const defaultConfigDir = claudeApiKeyConfigDir(path, stateDir, instanceId);
+      const claudeEnvironment = withClaudeApiKeyEnvironment({
+        apiKey: config.apiKey,
+        homePath: config.homePath,
+        environment,
+        defaultConfigDir,
+      });
+      if (
+        claudeEnvironment.some(
+          (variable) =>
+            variable.name === "CLAUDE_CONFIG_DIR" && variable.value === defaultConfigDir,
+        )
+      ) {
+        yield* fileSystem.makeDirectory(defaultConfigDir, { recursive: true }).pipe(
+          Effect.mapError(
+            (cause) =>
+              new ProviderDriverError({
+                driver: DRIVER_KIND,
+                instanceId,
+                detail: "Failed to create the Claude config directory for this API key instance.",
+                cause,
+              }),
+          ),
+        );
+      }
       const httpClient = yield* HttpClient.HttpClient;
       const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;
       const resetCreditCoordinator = yield* ResetCreditCoordinator.ResetCreditCoordinator;
@@ -128,7 +158,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       const modelCatalog = catalogService
         .current(DRIVER_KIND)
         .pipe(Effect.map(resolveClaudeModelCatalog));
-      const processEnv = yield* mergeProviderInstanceEnvironment(environment);
+      const processEnv = yield* mergeProviderInstanceEnvironment(claudeEnvironment);
       const fallbackContinuationIdentity = defaultProviderContinuationIdentity({
         driverKind: DRIVER_KIND,
         instanceId,
@@ -172,7 +202,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           instanceId,
           displayName,
           accentColor,
-          environment,
+          environment: claudeEnvironment,
           enabled,
           config,
         },

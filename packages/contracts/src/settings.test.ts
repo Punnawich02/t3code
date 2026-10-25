@@ -268,6 +268,13 @@ describe("custom model settings", () => {
   });
 });
 
+describe("ClaudeSettings API key", () => {
+  it("defaults apiKey to empty and marks it as a secret setting", () => {
+    expect(decodeClaudeSettings({}).apiKey).toBe("");
+    expect(secretSettingsFields(ClaudeSettings)).toEqual(["apiKey"]);
+  });
+});
+
 describe("ClaudeSettings auto-compaction", () => {
   it("uses Claude's default threshold when no override is configured", () => {
     expect(decodeClaudeSettings({}).autoCompactWindow).toBe("");
