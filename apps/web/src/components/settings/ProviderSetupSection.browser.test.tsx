@@ -1,4 +1,5 @@
 import {
+  type AntigravityAuthMethod,
   EnvironmentId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -128,6 +129,7 @@ function renderSetup(
     provider?: ServerProvider;
     enabled?: boolean;
     binaryPath?: string;
+    authMethod?: AntigravityAuthMethod;
   } = {},
 ) {
   return act(async () =>
@@ -138,6 +140,7 @@ function renderSetup(
         instanceId={instanceId}
         provider={options.provider ?? provider}
         binaryPath={options.binaryPath}
+        authMethod={options.authMethod}
         enabled={options.enabled ?? true}
         readOnly={options.readOnly ?? false}
         onEnable={vi.fn()}
@@ -343,6 +346,18 @@ describe("Antigravity setup", () => {
       expect(button("Change account")).toBeNull();
     },
   );
+
+  it("checks an API key instead of offering a Google sign-in", async () => {
+    setup.auth = authState({ phase: "succeeded", flowId: null, authorizationUrl: null });
+    await renderSetup({
+      authMethod: "gemini-api-key",
+      provider: { ...provider, status: "ready", auth: { status: "authenticated" } },
+    });
+    expect(button("Check connection")).not.toBeNull();
+    expect(button("Sign in")).toBeNull();
+    expect(button("Change account")).toBeNull();
+    expect(button("Sign out")).toBeNull();
+  });
 
   it("offers account actions after verified login when discovery cannot identify auth", async () => {
     setup.auth = authState({ phase: "succeeded", flowId: null, authorizationUrl: null });

@@ -33,12 +33,15 @@ export function ProviderAuthenticationSection({
   instanceId,
   provider,
   readOnly,
+  usesStoredCredentials = false,
 }: {
   readonly environmentId: EnvironmentId;
   readonly environmentLabel: string;
   readonly instanceId: ProviderInstanceId;
   readonly provider: ServerProvider;
   readonly readOnly: boolean;
+  /** Credentials such as an API key live in settings, so "sign in" only verifies them. */
+  readonly usesStoredCredentials?: boolean;
 }) {
   const target = { environmentId, input: { instanceId } };
   const query = useEnvironmentQuery(serverEnvironment.providerAuthState(target));
@@ -73,23 +76,29 @@ export function ProviderAuthenticationSection({
     !signedIn &&
     (provider.setup?.canAuthenticate === false ||
       (provider.driver === "acpRegistry" && auth?.methods?.length === 0));
-  const accountDescription = active
-    ? auth?.phase === "starting"
-      ? "Starting sign-in…"
-      : auth?.phase === "verifying"
-        ? "Checking your account…"
-        : interaction?.type === "terminal"
-          ? "Complete sign-in in the terminal below."
-          : interaction?.type === "credentials"
-            ? "Enter your credentials below."
-            : "Finish signing in in your browser."
-    : signedIn
-      ? "Signed in."
-      : isDiscovering
-        ? "Discovering sign-in methods…"
-        : needsExternalSetup
-          ? "No in-app sign-in advertised. Follow the provider's docs to finish setup."
-          : `Sign in on ${environmentLabel}.`;
+  const accountDescription = usesStoredCredentials
+    ? active
+      ? "Checking credentials…"
+      : signedIn
+        ? "Connected with the credentials in settings."
+        : "Uses the credentials in settings. No sign-in needed."
+    : active
+      ? auth?.phase === "starting"
+        ? "Starting sign-in…"
+        : auth?.phase === "verifying"
+          ? "Checking your account…"
+          : interaction?.type === "terminal"
+            ? "Complete sign-in in the terminal below."
+            : interaction?.type === "credentials"
+              ? "Enter your credentials below."
+              : "Finish signing in in your browser."
+      : signedIn
+        ? "Signed in."
+        : isDiscovering
+          ? "Discovering sign-in methods…"
+          : needsExternalSetup
+            ? "No in-app sign-in advertised. Follow the provider's docs to finish setup."
+            : `Sign in on ${environmentLabel}.`;
   const statusMessage = auth?.phase === "failed" ? auth.message : null;
   const disabled = readOnly || pending || query.error !== null || isDiscovering;
   const draftId = `${auth?.flowId ?? ""}:${interaction?.id ?? ""}`;
@@ -289,14 +298,19 @@ export function ProviderAuthenticationSection({
                   )
                 }
               >
-                {signedIn
-                  ? "Change account"
-                  : auth?.phase === "failed" || auth?.phase === "cancelled"
-                    ? "Retry sign-in"
-                    : "Sign in"}
+                {usesStoredCredentials
+                  ? "Check connection"
+                  : signedIn
+                    ? "Change account"
+                    : auth?.phase === "failed" || auth?.phase === "cancelled"
+                      ? "Retry sign-in"
+                      : "Sign in"}
               </Button>
             ) : null}
-            {!active && signedIn && (provider.auth.canLogout ?? provider.setup?.canAuthenticate) ? (
+            {!active &&
+            signedIn &&
+            !usesStoredCredentials &&
+            (provider.auth.canLogout ?? provider.setup?.canAuthenticate) ? (
               <Button
                 size="sm"
                 variant="ghost"

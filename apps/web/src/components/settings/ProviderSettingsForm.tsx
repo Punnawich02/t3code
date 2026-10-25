@@ -297,6 +297,8 @@ interface ProviderSettingsFormProps {
   readonly idPrefix: string;
   readonly variant: "card" | "dialog" | "settings";
   readonly onChange: (nextConfig: Record<string, unknown> | undefined) => void;
+  /** Fields a flow requires even though the schema marks them optional. */
+  readonly requiredKeys?: ReadonlyArray<string> | undefined;
 }
 
 function ProviderSettingsSelect({
@@ -567,8 +569,11 @@ export function ProviderSettingsForm({
   idPrefix,
   variant,
   onChange,
+  requiredKeys,
 }: ProviderSettingsFormProps) {
-  const fields = deriveProviderSettingsFields(definition, value);
+  const fields = deriveProviderSettingsFields(definition, value).map((field) =>
+    requiredKeys?.includes(field.key) ? { ...field, placeholder: "Required" } : field,
+  );
   const isLocalAcp =
     definition.driverKind === "acpRegistry" &&
     readProviderConfigString(value, "source") === "local";

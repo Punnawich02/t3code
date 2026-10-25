@@ -98,6 +98,7 @@ function ProviderSetupActions({
   provider,
   enabled,
   binaryPath,
+  authMethod,
 }: Pick<
   ProviderSetupSectionProps,
   "environmentId" | "environmentLabel" | "instanceId" | "enabled" | "binaryPath"
@@ -300,6 +301,7 @@ function ProviderSetupActions({
         instanceId={instanceId}
         provider={provider}
         readOnly={false}
+        usesStoredCredentials={authMethod !== "oauth-personal" && authMethod !== "oauth-business"}
       />
 
       {error || queryError ? (

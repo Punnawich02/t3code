@@ -86,6 +86,7 @@ const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 const ACP_REGISTRY_DRIVER_KIND = ProviderDriverKind.make("acpRegistry");
 const DEFAULT_DRIVER_OPTION = providerClients.definitions[0]!;
 const EMPTY_CONFIG_DRAFT: Record<string, unknown> = {};
+const REQUIRED_API_KEY_FIELDS = ["apiKey"];
 /**
  * Validate an instance id against the same slug rules the server applies in
  * `ProviderInstanceId` (see `packages/contracts/src/providerInstance.ts`).
@@ -689,6 +690,9 @@ export function AddProviderInstanceDialog({
                     idPrefix={`add-provider-${driver}`}
                     variant="settings"
                     onChange={setConfigDraft}
+                    requiredKeys={
+                      activePreset?.requiresApiKey ? REQUIRED_API_KEY_FIELDS : undefined
+                    }
                   />
                 </SettingsGroup>
               ) : !isAcpRegistry && wizardStep === 2 ? (
