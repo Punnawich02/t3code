@@ -1,6 +1,88 @@
+import { ProviderDriverKind } from "@t3tools/contracts";
+
 export type WizardNavigation =
   | { readonly kind: "navigate"; readonly step: number }
   | { readonly kind: "blocked"; readonly step: number; readonly error: string };
+
+export type ProviderConnectionMethod = "signIn" | "apiKey";
+
+export type ApiKeyProviderPresetId =
+  | "claude-api"
+  | "openai-api"
+  | "gemini-api"
+  | "openai-compatible";
+
+/**
+ * Presets are ordinary instances of existing drivers. Each one is its own draft because
+ * OpenAI API and OpenAI-compatible both use `customProvider`.
+ */
+export interface ApiKeyProviderPreset {
+  readonly id: ApiKeyProviderPresetId;
+  readonly label: string;
+  readonly driverKind: ProviderDriverKind;
+  readonly config: Readonly<Record<string, unknown>>;
+  readonly requiresApiKey: boolean;
+}
+
+export const API_KEY_PROVIDER_PRESETS: readonly ApiKeyProviderPreset[] = [
+  {
+    id: "claude-api",
+    label: "Claude API",
+    driverKind: ProviderDriverKind.make("claudeAgent"),
+    config: {},
+    requiresApiKey: true,
+  },
+  {
+    id: "openai-api",
+    label: "OpenAI API",
+    driverKind: ProviderDriverKind.make("customProvider"),
+    config: { apiFormat: "openai", baseUrl: "https://api.openai.com/v1" },
+    requiresApiKey: true,
+  },
+  {
+    id: "gemini-api",
+    label: "Gemini API",
+    driverKind: ProviderDriverKind.make("antigravity"),
+    config: { authMethod: "gemini-api-key" },
+    requiresApiKey: true,
+  },
+  {
+    id: "openai-compatible",
+    label: "OpenAI-compatible",
+    driverKind: ProviderDriverKind.make("customProvider"),
+    config: {},
+    requiresApiKey: false,
+  },
+];
+
+export function findApiKeyProviderPreset(id: string): ApiKeyProviderPreset | undefined {
+  return API_KEY_PROVIDER_PRESETS.find((preset) => preset.id === id);
+}
+
+/**
+ * Custom Provider is only offered through an API key preset. ACP Registry has its own
+ * section under Sign in, so it is not in the driver list.
+ */
+export function isSignInDriver(driverKind: string): boolean {
+  return driverKind !== "customProvider" && driverKind !== "acpRegistry";
+}
+
+export function seedApiKeyPresetConfig(
+  configs: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+  preset: ApiKeyProviderPreset,
+): Record<string, Readonly<Record<string, unknown>>> {
+  if (configs[preset.id] !== undefined) return { ...configs };
+  return { ...configs, [preset.id]: { ...preset.config } };
+}
+
+export function apiKeyRequiredError(
+  preset: ApiKeyProviderPreset,
+  config: Readonly<Record<string, unknown>>,
+): string | null {
+  if (!preset.requiresApiKey) return null;
+  const apiKey = config.apiKey;
+  return typeof apiKey === "string" && apiKey.trim().length > 0 ? null : "API key is required.";
+}
 
 const IDENTITY_STEP = 1;
 const ACP_REGISTRY_IDENTITY_STEP = 1;

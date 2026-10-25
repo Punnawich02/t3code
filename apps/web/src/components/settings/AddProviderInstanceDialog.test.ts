@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  apiKeyRequiredError,
   deriveAvailableInstanceId,
+  findApiKeyProviderPreset,
   getProviderIdentityDraft,
   isConfiguredAcpRegistryAgent,
+  isSignInDriver,
   resolveAcpRegistryWizardNavigation,
   resolveWizardNavigation,
+  seedApiKeyPresetConfig,
   updateProviderIdentityDraft,
 } from "./AddProviderInstanceDialog.logic";
 
@@ -113,5 +117,45 @@ describe("ACP Registry wizard", () => {
       label: "Gemini CLI",
       instanceIdOverride: "acpRegistry_gemini_cli",
     });
+  });
+});
+
+describe("Sign in and API key connection methods", () => {
+  it("lists every driver for sign-in except Custom Provider and ACP Registry", () => {
+    expect(isSignInDriver("codex")).toBe(true);
+    expect(isSignInDriver("claudeAgent")).toBe(true);
+    expect(isSignInDriver("customProvider")).toBe(false);
+    expect(isSignInDriver("acpRegistry")).toBe(false);
+  });
+
+  it("seeds each preset with its own draft, even when two presets share a driver", () => {
+    const openAi = findApiKeyProviderPreset("openai-api")!;
+    const compatible = findApiKeyProviderPreset("openai-compatible")!;
+    expect(openAi.driverKind).toBe(compatible.driverKind);
+
+    expect(seedApiKeyPresetConfig({}, openAi)).toEqual({
+      "openai-api": { apiFormat: "openai", baseUrl: "https://api.openai.com/v1" },
+    });
+    expect(seedApiKeyPresetConfig({}, compatible)).toEqual({ "openai-compatible": {} });
+    expect(findApiKeyProviderPreset("gemini-api")).toMatchObject({
+      driverKind: "antigravity",
+      config: { authMethod: "gemini-api-key" },
+    });
+  });
+
+  it("keeps the user's existing draft when a preset is chosen again", () => {
+    const openAi = findApiKeyProviderPreset("openai-api")!;
+    const drafts = { "openai-api": { baseUrl: "http://localhost:4000/v1" } };
+    expect(seedApiKeyPresetConfig(drafts, openAi)).toEqual(drafts);
+  });
+
+  it("requires an API key for Claude, OpenAI, and Gemini but not OpenAI-compatible", () => {
+    const claude = findApiKeyProviderPreset("claude-api")!;
+    const compatible = findApiKeyProviderPreset("openai-compatible")!;
+
+    expect(apiKeyRequiredError(claude, {})).toBe("API key is required.");
+    expect(apiKeyRequiredError(claude, { apiKey: "   " })).toBe("API key is required.");
+    expect(apiKeyRequiredError(claude, { apiKey: "sk-ant-test" })).toBeNull();
+    expect(apiKeyRequiredError(compatible, {})).toBeNull();
   });
 });

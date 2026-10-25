@@ -171,6 +171,11 @@ instance can have its own environment variables, such as API keys or a custom
 base URL. Mark secret values as sensitive; after saving, T3 Code does not display
 their original values.
 
+Add provider first asks how to connect. Sign in uses a CLI, app, or account you
+already have. API key adds Claude, OpenAI, or Gemini with a key, or any
+OpenAI-compatible endpoint. Both kinds can run side by side, such as Claude and
+Claude API.
+
 For provider-specific setup and accounts, see [Codex](./providers-codex.md),
 [Claude](./providers-claude.md), [OpenCode](./providers-opencode.md),
 [Antigravity](./providers-antigravity.md), [Pi](./providers-pi.md), and

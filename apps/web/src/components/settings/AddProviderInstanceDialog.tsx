@@ -30,6 +30,7 @@ import { Dialog } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { RadioGroup } from "../ui/radio-group";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { toastManager } from "../ui/toast";
 import { providerClients } from "./providerDriverMeta";
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
@@ -40,11 +41,18 @@ import { WizardPanel, WizardPopup, WizardHeader, WizardFooter } from "../ui/wiza
 import {
   ADD_PROVIDER_WIZARD_STEPS,
   ACP_REGISTRY_WIZARD_STEPS,
+  API_KEY_PROVIDER_PRESETS,
   LOCAL_ACP_WIZARD_STEPS,
+  apiKeyRequiredError,
   deriveAvailableInstanceId,
+  findApiKeyProviderPreset,
+  isSignInDriver,
   resolveAcpRegistryWizardNavigation,
   resolveWizardNavigation,
+  seedApiKeyPresetConfig,
   updateProviderIdentityDraft,
+  type ApiKeyProviderPresetId,
+  type ProviderConnectionMethod,
   type ProviderIdentityDraft,
   type WizardNavigation,
 } from "./AddProviderInstanceDialog.logic";
@@ -113,10 +121,13 @@ export function AddProviderInstanceDialog({
 
   const [wizardStep, setWizardStep] = useState(0);
   const [addingChatGptAccount, setAddingChatGptAccount] = useState(false);
-  const [driver, setDriver] = useState<ProviderDriverKind>(DEFAULT_DRIVER_KIND);
-  const [identityByDriver, setIdentityByDriver] = useState<Record<string, ProviderIdentityDraft>>(
-    {},
+  const [connectionMethod, setConnectionMethod] = useState<ProviderConnectionMethod>("signIn");
+  const [signInDriver, setSignInDriver] = useState<ProviderDriverKind>(DEFAULT_DRIVER_KIND);
+  const [apiKeyPresetId, setApiKeyPresetId] = useState<ApiKeyProviderPresetId>(
+    API_KEY_PROVIDER_PRESETS[0]!.id,
   );
+  // Keyed by driver for sign-in and by preset id for API key, since two presets share a driver.
+  const [identityByDraft, setIdentityByDraft] = useState<Record<string, ProviderIdentityDraft>>({});
   const [selectedAcp, setSelectedAcp] = useState<AcpRegistrySearchAgent | null>(null);
   const [localEnvironment, setLocalEnvironment] = useState<
     ReadonlyArray<ProviderInstanceEnvironmentVariable>
@@ -124,7 +135,7 @@ export function AddProviderInstanceDialog({
   const [isManualAcpConfiguration, setIsManualAcpConfiguration] = useState(false);
   const [isRegistryLoading, setIsRegistryLoading] = useState(false);
   const [isPreparingRegistryAgent, setIsPreparingRegistryAgent] = useState(false);
-  const [configByDriver, setConfigByDriver] = useState<Record<string, Record<string, unknown>>>({});
+  const [configByDraft, setConfigByDraft] = useState<Record<string, Record<string, unknown>>>({});
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [createdInstanceId, setCreatedInstanceId] = useState<ProviderInstanceId | null>(null);
@@ -137,14 +148,18 @@ export function AddProviderInstanceDialog({
     ...Object.keys(settings.providerInstances ?? {}),
   ]);
 
+  const activePreset =
+    connectionMethod === "apiKey" ? (findApiKeyProviderPreset(apiKeyPresetId) ?? null) : null;
+  const driver = activePreset?.driverKind ?? signInDriver;
+  const draftKey = activePreset?.id ?? driver;
   const driverOption = providerClients.get(driver) ?? DEFAULT_DRIVER_OPTION;
   const isAcpRegistry = driver === ACP_REGISTRY_DRIVER_KIND;
   const defaultIdentity: ProviderIdentityDraft = {
-    label: driverOption.label,
+    label: activePreset?.label ?? driverOption.label,
     accentColor: "",
     instanceIdOverride: null,
   };
-  const { label, accentColor, instanceIdOverride } = identityByDriver[driver] ?? defaultIdentity;
+  const { label, accentColor, instanceIdOverride } = identityByDraft[draftKey] ?? defaultIdentity;
   const instanceId =
     instanceIdOverride ??
     deriveAvailableInstanceId(
@@ -162,8 +177,25 @@ export function AddProviderInstanceDialog({
   const showInstanceIdError = hasAttemptedSubmit && instanceIdError !== null;
   const identityStep = 1;
   const previewLabel = label.trim() || `${driverOption.label} Workspace`;
+  const providerChoices =
+    connectionMethod === "apiKey"
+      ? API_KEY_PROVIDER_PRESETS.map((preset) => ({
+          value: preset.id,
+          label: preset.label,
+          driverKind: preset.driverKind,
+          badgeLabel: null,
+        }))
+      : providerClients.definitions
+          .filter((option) => isSignInDriver(option.driverKind))
+          .map((option) => ({
+            value: option.driverKind,
+            label: option.label,
+            driverKind: option.driverKind,
+            badgeLabel: option.badgeLabel ?? null,
+          }));
 
-  const configDraft = configByDriver[driver] ?? EMPTY_CONFIG_DRAFT;
+  const configDraft = configByDraft[draftKey] ?? EMPTY_CONFIG_DRAFT;
+  const apiKeyError = activePreset ? apiKeyRequiredError(activePreset, configDraft) : null;
   const isLocalAcp = isAcpRegistry && isManualAcpConfiguration && configDraft.source === "local";
   const localCommandPath =
     typeof configDraft.commandPath === "string" ? configDraft.commandPath.trim() : "";
@@ -181,22 +213,22 @@ export function AddProviderInstanceDialog({
         previewLabel,
         null,
       ] as const)
-    : ([driverOption.label, previewLabel, null] as const);
+    : ([activePreset?.label ?? driverOption.label, previewLabel, null] as const);
   const setConfigDraft = (config: Record<string, unknown> | undefined) => {
-    setConfigByDriver((existing) => {
+    setConfigByDraft((existing) => {
       const next = { ...existing };
       if (config === undefined || Object.keys(config).length === 0) {
-        delete next[driver];
+        delete next[draftKey];
       } else {
-        next[driver] = config;
+        next[draftKey] = config;
       }
       return next;
     });
   };
   const setIdentityDraft = (update: Partial<ProviderIdentityDraft>) => {
-    setIdentityByDriver((existing) => ({
+    setIdentityByDraft((existing) => ({
       ...existing,
-      [driver]: { ...(existing[driver] ?? defaultIdentity), ...update },
+      [draftKey]: { ...(existing[draftKey] ?? defaultIdentity), ...update },
     }));
   };
 
@@ -231,7 +263,7 @@ export function AddProviderInstanceDialog({
   };
 
   const handleAcpPrepared = (agent: AcpRegistrySearchAgent) => {
-    setDriver(ACP_REGISTRY_DRIVER_KIND);
+    setSignInDriver(ACP_REGISTRY_DRIVER_KIND);
     const nextLabel = agent.name;
     const registryIconUrl = resolveOfficialAcpRegistryIconUrl(agent.icon);
     const nextInstanceId = deriveAvailableInstanceId(
@@ -241,13 +273,13 @@ export function AddProviderInstanceDialog({
     );
     setSelectedAcp(agent);
     setIsManualAcpConfiguration(false);
-    setIdentityByDriver((existing) =>
+    setIdentityByDraft((existing) =>
       updateProviderIdentityDraft(existing, ACP_REGISTRY_DRIVER_KIND, {
         label: nextLabel,
         instanceIdOverride: nextInstanceId,
       }),
     );
-    setConfigByDriver((existing) => ({
+    setConfigByDraft((existing) => ({
       ...existing,
       [ACP_REGISTRY_DRIVER_KIND]: {
         agentId: agent.id,
@@ -260,15 +292,15 @@ export function AddProviderInstanceDialog({
   };
 
   const handleManualAcpConfiguration = () => {
-    setDriver(ACP_REGISTRY_DRIVER_KIND);
+    setSignInDriver(ACP_REGISTRY_DRIVER_KIND);
     setSelectedAcp(null);
     setIsManualAcpConfiguration(true);
-    setConfigByDriver((existing) => {
+    setConfigByDraft((existing) => {
       const next = { ...existing };
       delete next[ACP_REGISTRY_DRIVER_KIND];
       return next;
     });
-    setIdentityByDriver((existing) =>
+    setIdentityByDraft((existing) =>
       updateProviderIdentityDraft(existing, ACP_REGISTRY_DRIVER_KIND, {
         label: "",
         instanceIdOverride: null,
@@ -278,14 +310,14 @@ export function AddProviderInstanceDialog({
   };
 
   const handleLocalAcpConfiguration = () => {
-    setDriver(ACP_REGISTRY_DRIVER_KIND);
+    setSignInDriver(ACP_REGISTRY_DRIVER_KIND);
     setSelectedAcp(null);
     setIsManualAcpConfiguration(true);
-    setConfigByDriver((existing) => ({
+    setConfigByDraft((existing) => ({
       ...existing,
       [ACP_REGISTRY_DRIVER_KIND]: { source: "local", commandArgs: [] },
     }));
-    setIdentityByDriver((existing) =>
+    setIdentityByDraft((existing) =>
       updateProviderIdentityDraft(existing, ACP_REGISTRY_DRIVER_KIND, {
         label: "Local ACP",
         instanceIdOverride: null,
@@ -300,11 +332,9 @@ export function AddProviderInstanceDialog({
     if (isSaving || createdInstanceId) return;
     setHasAttemptedSubmit(true);
     if (instanceIdError !== null || (isAcpRegistry && acpSelectionError !== null)) return;
+    if (apiKeyError !== null) return;
 
-    const config =
-      driver === "codex"
-        ? { ...configByDriver[driver], setupMode: "existing" }
-        : (configByDriver[driver] ?? {});
+    const config = driver === "codex" ? { ...configDraft, setupMode: "existing" } : configDraft;
     const hasConfig = Object.keys(config).length > 0;
     const normalizedAccentColor = normalizeProviderAccentColor(accentColor);
 
@@ -397,58 +427,83 @@ export function AddProviderInstanceDialog({
           <>
             <WizardPanel
               className={cn(isAcpRegistry && wizardStep === identityStep && "min-h-72")}
-              holdHeight={wizardStep === 0 && !isManualAcpConfiguration && isRegistryLoading}
+              holdHeight={
+                wizardStep === 0 &&
+                connectionMethod === "signIn" &&
+                !isManualAcpConfiguration &&
+                isRegistryLoading
+              }
             >
               <div className={cn("grid gap-2", wizardStep !== 0 && "hidden")}>
+                <ToggleGroup
+                  aria-label="Connection method"
+                  className="w-full *:flex-1"
+                  disabled={isPreparingRegistryAgent}
+                  value={[connectionMethod]}
+                  onValueChange={(next) => {
+                    const value = next[0];
+                    if (value !== "signIn" && value !== "apiKey") return;
+                    setConnectionMethod(value);
+                    setHasAttemptedSubmit(false);
+                  }}
+                >
+                  <Toggle value="signIn">Sign in</Toggle>
+                  <Toggle value="apiKey">API key</Toggle>
+                </ToggleGroup>
                 <div id="add-instance-driver-label" className="text-sm font-medium text-foreground">
                   Provider
                 </div>
                 <RadioGroup
                   disabled={isPreparingRegistryAgent}
-                  value={driver}
+                  value={connectionMethod === "apiKey" ? apiKeyPresetId : signInDriver}
                   onValueChange={(value) => {
-                    setDriver(ProviderDriverKind.make(value));
-                    setIsManualAcpConfiguration(false);
                     setHasAttemptedSubmit(false);
+                    if (connectionMethod === "apiKey") {
+                      const preset = findApiKeyProviderPreset(value);
+                      if (!preset) return;
+                      setApiKeyPresetId(preset.id);
+                      setConfigByDraft((existing) => seedApiKeyPresetConfig(existing, preset));
+                      return;
+                    }
+                    setSignInDriver(ProviderDriverKind.make(value));
+                    setIsManualAcpConfiguration(false);
                   }}
                   aria-labelledby="add-instance-driver-label"
                   className="grid grid-cols-1 sm:grid-cols-2"
                 >
-                  {providerClients.definitions
-                    .filter((option) => option.driverKind !== ACP_REGISTRY_DRIVER_KIND)
-                    .map((option) => {
-                      return (
-                        <RadioPrimitive.Root
-                          key={option.driverKind}
-                          value={option.driverKind}
-                          className="relative flex cursor-pointer items-center gap-3 rounded-lg bg-card px-3 py-3 text-left text-muted-foreground outline-none ring-1 ring-black/5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-checked:bg-primary/8 data-checked:text-foreground data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary data-checked:hover:bg-primary/8 dark:bg-white/3 dark:ring-white/5 dark:hover:bg-white/5 dark:data-checked:bg-primary/15 dark:data-checked:ring-primary dark:data-checked:hover:bg-primary/15"
+                  {providerChoices.map((choice) => {
+                    return (
+                      <RadioPrimitive.Root
+                        key={choice.value}
+                        value={choice.value}
+                        className="relative flex cursor-pointer items-center gap-3 rounded-lg bg-card px-3 py-3 text-left text-muted-foreground outline-none ring-1 ring-black/5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-checked:bg-primary/8 data-checked:text-foreground data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary data-checked:hover:bg-primary/8 dark:bg-white/3 dark:ring-white/5 dark:hover:bg-white/5 dark:data-checked:bg-primary/15 dark:data-checked:ring-primary dark:data-checked:hover:bg-primary/15"
+                      >
+                        <ProviderInstanceIcon
+                          driverKind={choice.driverKind}
+                          displayName={choice.label}
+                          iconClassName="size-4"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                          {choice.label}
+                        </span>
+                        <RadioPrimitive.Indicator
+                          className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
+                          aria-hidden
                         >
-                          <ProviderInstanceIcon
-                            driverKind={option.driverKind}
-                            displayName={option.label}
-                            iconClassName="size-4"
-                          />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                            {option.label}
-                          </span>
-                          <RadioPrimitive.Indicator
-                            className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                            aria-hidden
-                          >
-                            <CheckIcon className="size-3.5 shrink-0" />
-                          </RadioPrimitive.Indicator>
-                          {option.badgeLabel ? (
-                            <Badge variant="warning" size="sm">
-                              {option.badgeLabel}
-                            </Badge>
-                          ) : null}
-                        </RadioPrimitive.Root>
-                      );
-                    })}
+                          <CheckIcon className="size-3.5 shrink-0" />
+                        </RadioPrimitive.Indicator>
+                        {choice.badgeLabel ? (
+                          <Badge variant="warning" size="sm">
+                            {choice.badgeLabel}
+                          </Badge>
+                        ) : null}
+                      </RadioPrimitive.Root>
+                    );
+                  })}
                 </RadioGroup>
               </div>
 
-              {wizardStep === 0 ? (
+              {wizardStep === 0 && connectionMethod === "signIn" ? (
                 <div className="space-y-4 pt-4">
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <div aria-hidden className="flex-1 border-t border-border/70" />
@@ -642,6 +697,9 @@ export function AddProviderInstanceDialog({
                     This driver has no required configuration. You can add the instance now.
                   </p>
                 </div>
+              ) : null}
+              {wizardStep === 2 && hasAttemptedSubmit && apiKeyError ? (
+                <p className="text-2xs text-destructive">{apiKeyError}</p>
               ) : null}
             </WizardPanel>
 

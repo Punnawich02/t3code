@@ -113,6 +113,7 @@ describe("ProviderSettingsForm helpers", () => {
     expect(claude).toBeDefined();
 
     expect(deriveProviderSettingsFields(claude!).map((field) => field.key)).toEqual([
+      "apiKey",
       "binaryPath",
       "homePath",
       "autoCompactWindow",
