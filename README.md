@@ -1,35 +1,37 @@
-# T3 Code (Custom Provider fork)
+# T3 Code (Fork ที่เพิ่ม Custom Provider)
 
-This is a fork of [T3 Code](https://github.com/pingdotgg/t3code) by T3 Tools Inc. (`pingdotgg/t3code`), the open source "agent harness control surface" for Codex, Claude Code, Cursor, Grok Build, OpenCode and Google Antigravity. It keeps upstream's server, web, desktop and mobile apps and is based on upstream commit `1451e7cb2`. Credit for the base project goes to the T3 Code maintainers. It stays under the MIT license in [LICENSE](./LICENSE).
+โปรเจกต์นี้เป็น fork ของ [T3 Code](https://github.com/pingdotgg/t3code) โดย T3 Tools Inc. (`pingdotgg/t3code`) ซึ่งเป็น open source "agent harness control surface" สำหรับควบคุม Codex, Claude Code, Cursor, Grok Build, OpenCode และ Google Antigravity ผ่านแอป web, desktop และ mobile
 
-The fork adds the ability to point T3 Code at inference servers that are not one of the built-in providers.
+Fork นี้ใช้ server, web, desktop และ mobile ของต้นฉบับทั้งหมด โดยต่อยอดจาก upstream commit `1451e7cb2` เครดิตของโปรเจกต์ต้นทางเป็นของทีมผู้พัฒนา T3 Code และยังคงใช้สัญญาอนุญาต MIT ตามไฟล์ [LICENSE](./LICENSE)
 
-## What this fork adds
+สิ่งที่ fork นี้เพิ่มเข้ามาคือความสามารถในการเชื่อมต่อกับ inference server ที่ไม่ใช่ provider ที่มีมาให้ในตัว
 
-- **Custom Provider.** Connect any OpenAI-compatible endpoint (Ollama, LM Studio, vLLM, a hosted gateway, ...) from **Settings → Providers → Add provider → Custom Provider**. You enter a Base URL and an optional API key. Models are discovered from `/v1/models`. Under the hood it runs T3 Code's managed Codex against that endpoint, and T3 Code downloads Codex itself if it is missing. See [docs/user/providers-custom.md](./docs/user/providers-custom.md).
-- **Connection method in Add provider.** The dialog first asks how to connect: **Sign in** (a CLI, app or account you already have) or **API key** (Claude API, OpenAI API, Gemini API or any OpenAI-compatible endpoint). Claude instances can use an Anthropic API key with their own config directory, so a signed-in Claude and a Claude API instance can run side by side. See [docs/user/install.md](./docs/user/install.md#providers) and [docs/user/providers-claude.md](./docs/user/providers-claude.md).
+## สิ่งที่ fork นี้เพิ่ม
 
-Everything else behaves like upstream. Upstream's documentation index is under [Documentation](#documentation).
+- **Custom Provider** เชื่อมต่อ endpoint ที่เข้ากันได้กับ OpenAI (Ollama, LM Studio, vLLM, gateway ที่โฮสต์ไว้ ฯลฯ) ได้จาก **Settings → Providers → Add provider → Custom Provider** กรอก Base URL และ API key (ไม่บังคับ) ระบบจะค้นหา model จาก `/v1/models` ให้เอง ภายในใช้ Codex ที่ T3 Code จัดการให้ รันกับ endpoint นั้น และถ้ายังไม่มี Codex ระบบจะดาวน์โหลดให้เอง ดู [docs/user/providers-custom.md](./docs/user/providers-custom.md)
+- **เลือกวิธีเชื่อมต่อใน Add provider** หน้าต่างจะถามก่อนว่าจะเชื่อมต่อแบบไหน: **Sign in** (ใช้ CLI, แอป หรือบัญชีที่มีอยู่แล้ว) หรือ **API key** (Claude API, OpenAI API, Gemini API หรือ endpoint ที่เข้ากันได้กับ OpenAI) instance ของ Claude ใช้ Anthropic API key ได้โดยมี config directory แยกของตัวเอง จึงใช้ Claude ที่ sign in ไว้กับ Claude API ควบคู่กันได้ ดู [docs/user/install.md](./docs/user/install.md#providers) และ [docs/user/providers-claude.md](./docs/user/providers-claude.md)
 
-## Installing
+ส่วนอื่นทำงานเหมือนต้นฉบับ ดูสารบัญเอกสารของ upstream ได้ที่หัวข้อ [เอกสาร](#เอกสาร)
 
-This fork does not publish releases, so you build the desktop app yourself (next section). Do not use the `curl ... t3.codes/install.sh`, `winget`, `scoop`, `brew` or AUR installs from upstream's README; those install upstream's build, without the features above.
+## การติดตั้ง
 
-You still need at least one provider to chat with. For Custom Provider that is just a running endpoint, for example Ollama on `http://localhost:11434/v1`. Give it a context window of at least 32k tokens.
+Fork นี้ไม่ได้ปล่อย release สำเร็จรูป ต้อง build แอป desktop เอง (ดูหัวข้อถัดไป) **ห้ามใช้** วิธีติดตั้งใน README ของ upstream อย่าง `curl ... t3.codes/install.sh`, `winget`, `scoop`, `brew` หรือ AUR เพราะจะได้ build ของต้นฉบับ ซึ่งไม่มีฟีเจอร์ข้างบน
 
-## Building the desktop app
+ต้องมีอย่างน้อยหนึ่ง provider ไว้คุยด้วย สำหรับ Custom Provider คือมี endpoint ที่รันอยู่ เช่น Ollama ที่ `http://localhost:11434/v1` และควรตั้ง context window อย่างน้อย 32k tokens
 
-### Common requirements (all OS)
+## Build แอป desktop
 
-| Requirement                 | Notes                                                                                                                   |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Git                         | To clone the repository.                                                                                                |
-| Node.js 24 (`^24.13.1`)     | Enforced by `engines` in `package.json`. The `vp` tool below can supply it.                                             |
-| `vp` (Vite+)                | The task runner and package manager front end. `pnpm@11` is selected automatically through `packageManager`.            |
-| Rust 1.85 or newer (rustup) | Builds the native resource monitor. Use [rustup](https://rustup.rs), not the distro package: it needs the 2024 edition. |
-| ~5 GB free disk, internet   | Dependencies are large, and electron-builder downloads Electron and packaging tools.                                    |
+### สิ่งที่ต้องมี (ทุก OS)
 
-Install `vp`:
+| สิ่งที่ต้องมี                          | หมายเหตุ                                                                                                                           |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Git                                    | สำหรับ clone repository                                                                                                            |
+| Node.js 24 (`^24.13.1`)                | กำหนดไว้ใน `engines` ของ `package.json` และ `vp` ด้านล่างสามารถจัดหาให้ได้                                                         |
+| `vp` (Vite+)                           | task runner และตัวครอบ package manager ระบบจะเลือก `pnpm@11` ให้เองจาก `packageManager`                                            |
+| Rust 1.85 ขึ้นไป (ผ่าน rustup)         | ใช้ build resource monitor ตัว native ให้ติดตั้งผ่าน [rustup](https://rustup.rs) ไม่ใช่แพ็กเกจของ distro เพราะต้องใช้ edition 2024 |
+| พื้นที่ว่างประมาณ 5 GB และอินเทอร์เน็ต | dependencies มีขนาดใหญ่ และ electron-builder ต้องดาวน์โหลด Electron กับเครื่องมือแพ็กเกจ                                           |
+
+ติดตั้ง `vp`:
 
 ```bash
 # macOS / Linux
@@ -41,7 +43,7 @@ curl -fsSL https://vite.plus | bash
 irm https://vite.plus/ps1 | iex
 ```
 
-Get the source and dependencies (the same on every OS):
+ดึง source และติดตั้ง dependencies (เหมือนกันทุก OS):
 
 ```bash
 git clone https://github.com/Punnawich02/t3code.git
@@ -49,103 +51,103 @@ cd t3code
 vp i
 ```
 
-Each OS builds its own installer. A Linux host cannot build the macOS or Windows app, and the reverse. Output goes to `release/`.
+แต่ละ OS ต้อง build installer บนเครื่อง OS นั้นเอง เครื่อง Linux build แอป macOS หรือ Windows ไม่ได้ และกลับกัน ผลลัพธ์อยู่ในโฟลเดอร์ `release/`
 
-### Linux (AppImage and `.deb`)
+### Linux (AppImage และ `.deb`)
 
-Build on Linux: the browser-secret helper links against the host's libsecret.
+ต้อง build บน Linux เพราะ browser-secret helper ลิงก์กับ libsecret ของเครื่อง
 
 ```bash
 # Ubuntu / Debian
 sudo apt-get update
 sudo apt-get install build-essential libsecret-1-dev pkg-config imagemagick
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # then open a new shell
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # จากนั้นเปิด shell ใหม่
 
 # Fedora
 sudo dnf install gcc gcc-c++ make libsecret-devel pkgconf-pkg-config ImageMagick
 
 # Arch
 sudo pacman -S base-devel libsecret pkgconf imagemagick
-# then install Rust with rustup as above
+# แล้วติดตั้ง Rust ด้วย rustup เหมือนข้างบน
 ```
 
-Build and install:
+Build และติดตั้ง:
 
 ```bash
 vp run dist:desktop:linux
 ```
 
-This produces an AppImage and a `.deb` in `release/`.
+คำสั่งนี้สร้าง AppImage และ `.deb` ใน `release/`
 
 ```bash
 # Debian / Ubuntu
 sudo apt install ./release/T3-Code-*.deb
 
-# any distro
+# ทุก distro
 chmod +x release/T3-Code-*.AppImage && ./release/T3-Code-*.AppImage
 ```
 
 ### macOS (DMG)
 
-Requirements: Xcode Command Line Tools, plus the common ones above.
+ต้องมี Xcode Command Line Tools นอกเหนือจากที่ต้องมีทุก OS
 
 ```bash
 xcode-select --install
-rustup target add aarch64-apple-darwin x86_64-apple-darwin   # only for a cross-architecture build
+rustup target add aarch64-apple-darwin x86_64-apple-darwin   # เฉพาะเมื่อ build ข้ามสถาปัตยกรรม
 
-vp run dist:desktop:dmg          # this machine's architecture
+vp run dist:desktop:dmg          # สถาปัตยกรรมของเครื่องนี้
 vp run dist:desktop:dmg:arm64    # Apple Silicon
 vp run dist:desktop:dmg:x64      # Intel
 ```
 
-Open the `.dmg` in `release/` and drag the app to Applications. Builds are unsigned unless you pass `--signed` with Apple credentials ([release runbook](./docs/operations/release.md)), so on first launch right-click the app and choose **Open**.
+เปิดไฟล์ `.dmg` ใน `release/` แล้วลากแอปไปที่ Applications ถ้าไม่ได้ใส่ `--signed` พร้อม credentials ของ Apple ([release runbook](./docs/operations/release.md)) แอปจะไม่ถูก sign ดังนั้นเปิดครั้งแรกให้คลิกขวาที่แอปแล้วเลือก **Open**
 
-### Windows (NSIS installer)
+### Windows (ตัวติดตั้ง NSIS)
 
-Requirements, in addition to the common ones:
+สิ่งที่ต้องมีเพิ่มจากที่ต้องมีทุก OS:
 
-- Python 3 (used by node-gyp).
-- Visual Studio Build Tools with **Desktop development with C++**, including the Windows SDK and the MSVC build tools and Spectre-mitigated libraries for your architecture.
-- The matching Rust target.
+- Python 3 (node-gyp ใช้)
+- Visual Studio Build Tools พร้อม **Desktop development with C++** รวม Windows SDK, MSVC build tools และ Spectre-mitigated libraries ของสถาปัตยกรรมที่ใช้
+- Rust target ที่ตรงกัน
 
 ```powershell
-rustup target add x86_64-pc-windows-msvc      # or aarch64-pc-windows-msvc for ARM64
+rustup target add x86_64-pc-windows-msvc      # หรือ aarch64-pc-windows-msvc สำหรับ ARM64
 
-vp run dist:desktop:win          # this machine's architecture
+vp run dist:desktop:win          # สถาปัตยกรรมของเครื่องนี้
 vp run dist:desktop:win:x64
 vp run dist:desktop:win:arm64
 ```
 
-Run the `.exe` installer in `release/`. It is unsigned, so SmartScreen will warn you.
+รันตัวติดตั้ง `.exe` ใน `release/` ตัวติดตั้งไม่ได้ถูก sign จึงมีคำเตือนจาก SmartScreen
 
-### Run from source instead
+### รันจาก source โดยไม่ต้องแพ็กเกจ
 
-To try the fork without packaging it:
+ถ้าแค่อยากลอง fork นี้:
 
 ```bash
 vp run dev
 ```
 
-Open the pairing URL printed in the `[dev-runner]` output. The bare origin does not authenticate a new browser. See [docs/operations/development.md](./docs/operations/development.md).
+เปิด pairing URL ที่แสดงในบรรทัด `[dev-runner]` การเปิด origin เปล่า ๆ จะไม่ยืนยันตัวตนให้ browser ใหม่ ดู [docs/operations/development.md](./docs/operations/development.md)
 
-### Troubleshooting
+### แก้ปัญหา
 
-- **`vp i` fails with `ENETUNREACH`** on a network without IPv6: run it as `NODE_OPTIONS="--dns-result-order=ipv4first --no-network-family-autoselection" vp i`.
-- **The build script lists missing prerequisites.** It checks the tools above before building and prints what is missing and how to install it.
-- **`rustc` is too old** (for example Ubuntu's packaged one): remove the distro package and use rustup.
+- **`vp i` ล้มเหลวด้วย `ENETUNREACH`** บนเครือข่ายที่ไม่มี IPv6: รันเป็น `NODE_OPTIONS="--dns-result-order=ipv4first --no-network-family-autoselection" vp i`
+- **สคริปต์ build แจ้งว่าขาดเครื่องมือ** สคริปต์ตรวจเครื่องมือข้างบนก่อน build และจะบอกว่าขาดอะไรกับวิธีติดตั้ง
+- **`rustc` เก่าเกินไป** (เช่นแพ็กเกจของ Ubuntu): ถอนแพ็กเกจของ distro แล้วใช้ rustup
 
-## Documentation
+## เอกสาร
 
-Full docs live in [docs/](./docs).
+เอกสารทั้งหมดอยู่ใน [docs/](./docs)
 
-- [Install and first run](./docs/user/install.md)
+- [ติดตั้งและเริ่มใช้งานครั้งแรก](./docs/user/install.md)
 - [Custom Provider](./docs/user/providers-custom.md)
 - [Permission modes](./docs/user/permission-modes.md)
 - [Keyboard shortcuts](./docs/user/keybindings.md)
 - [Project settings](./docs/user/project-settings.md)
-- [Remote access from a phone or another machine](./docs/user/remote-access.md)
-- [Connect other agents over MCP](./docs/user/outside-agents.md)
-- Multiple accounts: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
-- [Run T3 Code as a background service](./docs/user/background-service.md)
+- [เข้าถึงจากมือถือหรือเครื่องอื่น](./docs/user/remote-access.md)
+- [เชื่อมต่อ agent อื่นผ่าน MCP](./docs/user/outside-agents.md)
+- หลายบัญชี: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
+- [รัน T3 Code เป็น background service](./docs/user/background-service.md)
 
-Architecture and contributor notes start at [docs/internals/overview.md](./docs/internals/overview.md); read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a PR upstream.
+สถาปัตยกรรมและบันทึกสำหรับผู้พัฒนาเริ่มที่ [docs/internals/overview.md](./docs/internals/overview.md) และอ่าน [CONTRIBUTING.md](./CONTRIBUTING.md) ก่อนเปิด PR ไปที่ upstream
